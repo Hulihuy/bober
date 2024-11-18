@@ -1,67 +1,82 @@
-"""
-This is a echo bot.
-It echoes any incoming text messages.
-"""
+import tkinter as tk
+import sqlite3
 
-import logging
 
-import requests
-from aiogram import Bot, Dispatcher, executor, types
+def register():
+    register_window = tk.Toplevel(root)
+    register_window.title("Регистрация")
 
-OPENWEATHER_API_KEY = "c28b8f13af900c5c45364126a91d34ae"
+    lbl_username = tk.Label(register_window, text="Логин:")
+    lbl_username.pack()
+    entry_username = tk.Entry(register_window)
+    entry_username.pack()
 
-API_TOKEN = '7522501900:AAGgD8U6A0YXdpRlnvxJJ9ZVU3EvYZUOB38'
+    lbl_password = tk.Label(register_window, text="Пароль:")
+    lbl_password.pack()
+    entry_password = tk.Entry(register_window, show="*")
+    entry_password.pack()
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+    def add_user():
+        username = entry_username.get()
+        password = entry_password.get()
 
-# Initialize bot and dispatcher
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher(bot)
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
+        conn.commit()
 
-def get_weather_samara():
-    city = "Самара"
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric&lang=ru";
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json()
-        temp = data['main']['temp']
-        feels_like = data['main']['feels_like']
-        weather_desc = data['weather'][0]['description'].capitalize()
-        humidity = data['main']['humidity']
-        wind_speed = data['wind']['speed']
-        city_name = data['name']
-        country = data['sys']['country']
-        return (
-f"🌤 Погода в {city_name}, {country}:\n"
-f"Температура: {temp}°C (ощущается как {feels_like}°C)\n"
-f"Описание: {weather_desc}\n"
-f"Влажность: {humidity}%\n"
-f"Скорость ветра: {wind_speed} м/с"
-)
+        conn.close()
+        register_window.destroy()
+
+    btn_register = tk.Button(register_window, text="Зарегистрировать", command=add_user)
+    btn_register.pack()
+
+
+def authenticate():
+    username = entry_username.get()
+    password = entry_password.get()
+
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
+
+    if c.fetchone():
+        lbl_result.config(text="Успешная авторизация")
     else:
-        return '❌ Не удалось получить данные о погоде.'
+        lbl_result.config(text="Неверный логин или пароль")
+
+    conn.close()
 
 
-@dp.message_handler(commands=['start', 'help'])
-async def send_welcome(message: types.Message):
+root = tk.Tk()
+root.title("Авторизация")
 
-    await message.reply("Привет!\nЯ - бот погоды в Самаре!\nПриятного пользования!")
+lbl_username = tk.Label(root, text="Логин:")
+lbl_username.pack()
+entry_username = tk.Entry(root)
+entry_username.pack()
 
-@dp.message_handler(commands=['weather'])
-async def send_weather(message: types.Message):
-    weather_info = get_weather_samara()
-    await message.reply(weather_info)
+lbl_password = tk.Label(root, text="Пароль:")
+lbl_password.pack()
+entry_password = tk.Entry(root, show="*")
+entry_password.pack()
 
+btn_login = tk.Button(root, text="Войти", command=authenticate)
+btn_login.pack()
 
+btn_register = tk.Button(root, text="Регистрация", command=register)
+btn_register.pack()
 
-@dp.message_handler()
-async def echo(message: types.Message):
+lbl_result = tk.Label(root, text="")
+lbl_result.pack()
 
+conn = sqlite3.connect('users.db')
+c = conn.cursor()
+c.execute('''CREATE TABLE IF NOT EXISTS users (
+             id INTEGER PRIMARY KEY,
+             username TEXT,
+             password TEXT)''')
+conn.commit()
+conn.close()
 
-    await message.answer(message.text)
-
-
-
-if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+root.mainloop()
